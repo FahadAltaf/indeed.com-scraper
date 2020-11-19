@@ -4,6 +4,7 @@ using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -11,6 +12,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
+using System.Web.Configuration;
 
 namespace indeed.com.scraper
 {
@@ -53,9 +55,10 @@ namespace indeed.com.scraper
 
                 ChromeDriverService defaultService = ChromeDriverService.CreateDefaultService();
                 defaultService.HideCommandPromptWindow = true;
-
-                using (IWebDriver driver = (IWebDriver)new ChromeDriver(defaultService, options))
+                bool showGUI = Convert.ToBoolean(ConfigurationManager.AppSettings.Get("showGUI"));
+                using (IWebDriver driver = (showGUI) ? new ChromeDriver() : (IWebDriver)new ChromeDriver(defaultService, options))
                 {
+                    driver.Manage().Window.Maximize();
                     Console.WriteLine("Loading https://www.indeed.com/...");
                     driver.Navigate().GoToUrl("https://www.indeed.com/");
 
