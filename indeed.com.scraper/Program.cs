@@ -75,8 +75,8 @@ namespace indeed.com.scraper
                     "headless",
                     "incognito"
                 });
-              
-                    ChromeDriverService defaultService = ChromeDriverService.CreateDefaultService();
+
+                ChromeDriverService defaultService = ChromeDriverService.CreateDefaultService();
                 defaultService.HideCommandPromptWindow = true;
                 bool showGUI = Convert.ToBoolean(ConfigurationManager.AppSettings.Get("showGUI"));
                 using (IWebDriver driver = (showGUI) ? new ChromeDriver() : (IWebDriver)new ChromeDriver(defaultService, options))
@@ -115,61 +115,66 @@ namespace indeed.com.scraper
                         if (count == null) { Console.WriteLine("No results found against your search."); }
                         else
                         {
-
-                            //  ExtractData(doc);
                             int pages = 1;
                             string url = driver.Url;
                             for (int i = 0; i < pages; i++)
                             {
-                                Console.WriteLine($"Processing page {i + 1}");
-                                string start = $"&start={(i * 10)}";
-                                if (!string.IsNullOrEmpty(age))
-                                    switch (age)
-                                    {
-                                        case "1":
-                                            start += "&fromage=1";
-                                            break;
-                                        case "3":
-                                            start += "&fromage=3";
-                                            break;
-                                        case "7":
-                                            start += "&fromage=7";
-                                            break;
-                                        case "14":
-                                            start += "&fromage=14";
-                                            break;
-                                        default:
-                                            break;
-                                    }
-                                var parts = url.Split(new string[] { "&_ga" }, StringSplitOptions.RemoveEmptyEntries);
-                                var newUrl =(parts[0]+ start);
-                                driver.Navigate().GoToUrl($"{newUrl}{((parts.Length>1)?("&_ga"+parts[1]):"")}");
-                                Thread.Sleep(3000);
-                                if (i == 0)
+                                try
                                 {
-                                    doc = new HtmlDocument();
-                                    doc.LoadHtml(driver.PageSource);
+                                    Console.WriteLine($"Processing page {i + 1}");
+                                    string start = $"&start={(i * 10)}";
+                                    if (!string.IsNullOrEmpty(age))
+                                        switch (age)
+                                        {
+                                            case "1":
+                                                start += "&fromage=1";
+                                                break;
+                                            case "3":
+                                                start += "&fromage=3";
+                                                break;
+                                            case "7":
+                                                start += "&fromage=7";
+                                                break;
+                                            case "14":
+                                                start += "&fromage=14";
+                                                break;
+                                            default:
+                                                break;
+                                        }
+                                    var parts = url.Split(new string[] { "&_ga" }, StringSplitOptions.RemoveEmptyEntries);
+                                    var newUrl = (parts[0] + start);
+                                    driver.Navigate().GoToUrl($"{newUrl}{((parts.Length > 1) ? ("&_ga" + parts[1]) : "")}");
+                                    Thread.Sleep(3000);
+                                    if (i == 0)
+                                    {
+                                        doc = new HtmlDocument();
+                                        doc.LoadHtml(driver.PageSource);
 
-                                    count = doc.DocumentNode.SelectSingleNode("//div[@id='searchCountPages']");
-                                    var total = Convert.ToInt32(count.InnerText.Split(new string[] { "of" }, StringSplitOptions.RemoveEmptyEntries)[1].Replace("jobs", "").Replace(",", "").Trim());
-                                    pages = (total + 10 - 1) / 10;
+                                        count = doc.DocumentNode.SelectSingleNode("//div[@id='searchCountPages']");
+                                        var total = Convert.ToInt32(count.InnerText.Split(new string[] { "of" }, StringSplitOptions.RemoveEmptyEntries)[1].Replace("jobs", "").Replace(",", "").Trim());
+                                        pages = (total + 10 - 1) / 10;
+                                    }
+
+                                    ExtractData(driver);
+                                    Export();
                                 }
-
-                                ExtractData(driver);
-                                Export();
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"Unable to scrape data from page {i + 1}. Reason: " + ex.Message);
+                                }
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine("Error: "+ex.Message);
+                        Console.WriteLine("Error: " + ex.Message);
                     }
 
                     driver.Close();
                     Thread.Sleep(3000);
                     driver?.Dispose();
                 }
-            
+
                 if (records.Count > 0)
                 {
                     Export();
@@ -182,7 +187,7 @@ namespace indeed.com.scraper
             {
                 if (ex.Message.Contains("This version of ChromeDriver only supports Chrome"))
                 {
-                    Console.WriteLine("Please update your chrome browser.");
+                    Console.WriteLine("Please update your chrome browser or script driver.");
                 }
                 else
                     Console.WriteLine("We are unable to continue. Reason: " + ex.Message);
@@ -190,134 +195,24 @@ namespace indeed.com.scraper
             Console.WriteLine("Press any key to exit");
             Console.ReadKey();
         }
-        public static bool CheckForLatestDrivers()
-        {
-            KillAlreadyRunningDriver();
-            var versionInfo = FileVersionInfo.GetVersionInfo(@"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe");
-            string currentChromeVersion = versionInfo.FileVersion;
-
-            bool hasLatestDriver = false;
-            string currentVersion = string.Empty;
-            string versionFileName = "version.txt";
-            if (File.Exists(versionFileName))
-                currentVersion = File.ReadAllText(versionFileName);
-            else
-                File.Create("versionFileName");
-
-
-            HtmlWeb web = new HtmlWeb();
-            var doc = web.Load("https://sites.google.com/a/chromium.org/chromedriver/downloads");
-            for (int i = 1; i <= 3; i++)
-            {
-                var linkNode = doc.DocumentNode.SelectSingleNode($"//*[@id=\"sites-canvas-main-content\"]/table/tbody/tr/td/div/div[1]/ul/li[{i}]/a");
-                if (linkNode != null)
-                {
-                    var latestVersion = linkNode.InnerText.Replace("ChromeDriver ", "");
-                    if (latestVersion.Split('.')[0] == currentChromeVersion.Split('.')[0])
-                    {
-                        if (latestVersion == currentVersion)
-                        {
-                            Console.WriteLine("You have the latest version of chrome driver");
-                            hasLatestDriver = true;
-                            break;
-                        }
-                        else
-                        {
-                            // Download drivers
-                            try
-                            {
-                                using (var client = new WebClient())
-                                {
-                                    client.DownloadFile($"https://chromedriver.storage.googleapis.com/{latestVersion}/chromedriver_win32.zip", "chromedriver_win32.zip");
-                                    if (File.Exists("chromedriver.exe"))
-                                    {
-                                        KillAlreadyRunningDriver();
-
-                                        File.Delete("chromedriver.exe");
-                                    }
-                                    ZipFile.ExtractToDirectory("chromedriver_win32.zip", Environment.CurrentDirectory);
-                                    File.WriteAllText(versionFileName, latestVersion);
-                                    hasLatestDriver = true;
-                                }
-                                Console.WriteLine("Driver downloaded successfully.");
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine("Unable to download latest version. Reason: " + ex.Message);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Downloading latest version {latestVersion}");
-                        if (latestVersion.Split('.')[0] == currentChromeVersion.Split('.')[0])
-                        {
-                            try
-                            {
-                                using (var client = new WebClient())
-                                {
-                                    client.DownloadFile($"https://chromedriver.storage.googleapis.com/{latestVersion}/chromedriver_win32.zip", "chromedriver_win32.zip");
-                                    if (File.Exists("chromedriver.exe"))
-                                    {
-                                        Process[] chromeDriverProcesses = Process.GetProcessesByName("chromedriver");
-                                        foreach (var chromeDriverProcess in chromeDriverProcesses)
-                                        {
-                                            var path = chromeDriverProcess.MainModule.FileName;
-                                            if (path == Path.Combine(Environment.CurrentDirectory, "chromedriver.exe"))
-                                            {
-                                                chromeDriverProcess.Kill();
-                                            }
-                                        }
-
-                                        File.Delete("chromedriver.exe");
-                                    }
-                                    ZipFile.ExtractToDirectory("chromedriver_win32.zip", Environment.CurrentDirectory);
-                                    File.WriteAllText(versionFileName, latestVersion);
-                                    hasLatestDriver = true;
-                                }
-                                Console.WriteLine("Driver downloaded successfully.");
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine("Unable to download latest version. Reason: " + ex.Message);
-                            }
-                        }
-
-                    }
-                }
-            }
-
-
-
-
-
-
-
-            return hasLatestDriver;
-        }
-
-        private static void KillAlreadyRunningDriver()
-        {
-            Process[] chromeDriverProcesses = Process.GetProcessesByName("chromedriver");
-            foreach (var chromeDriverProcess in chromeDriverProcesses)
-            {
-                var path = chromeDriverProcess.MainModule.FileName;
-                if (path == Path.Combine(Environment.CurrentDirectory, "chromedriver.exe"))
-                {
-                    chromeDriverProcess.Kill();
-                }
-            }
-        }
 
         private static void Export()
         {
-            string name = $"{today.Year}{today.Month}{today.Day}{today.Hour}{today.Minute}{today.Second}.csv";
-            using (var writer = new StreamWriter(name))
-            using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+            try
             {
-                csv.WriteRecords(records);
+                string name = $"{today.Year}{today.Month}{today.Day}{today.Hour}{today.Minute}{today.Second}.csv";
+                using (var writer = new StreamWriter(name))
+                using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+                {
+                    csv.WriteRecords(records);
+                }
+                Console.WriteLine("Data exported successfully");
+
             }
-            Console.WriteLine("Data exported successfully");
+            catch (Exception ex)
+            {
+                Console.WriteLine("Unable to perform data export. Reason: " + ex.Message);
+            }
         }
 
         private static void ExtractData(IWebDriver driver)
@@ -328,9 +223,9 @@ namespace indeed.com.scraper
             var node = doc.DocumentNode.SelectSingleNode("//div[@id='mosaic-provider-jobcards']");
             if (node != null)
             {
-                foreach (var record in node.ChildNodes.Where(x=>x.Name=="a"))
+                foreach (var record in node.ChildNodes.Where(x => x.Name == "a"))
                 {
-                   // Thread.Sleep(1000);
+                    // Thread.Sleep(1000);
                     try
                     {
                         var entry = new DataModel()
@@ -349,7 +244,7 @@ namespace indeed.com.scraper
                         if (title != null)
                         {
                             entry.Url = HttpUtility.HtmlDecode("https://www.indeed.com" + record.Attributes.FirstOrDefault(x => x.Name == "href").Value);
-                            entry.Title = HttpUtility.HtmlDecode((title.ChildNodes.Count==1)? title.ChildNodes[0].InnerText.Replace("\n", "").Replace("\r", "") : title.ChildNodes[1].InnerText.Replace("\n", "").Replace("\r", ""));
+                            entry.Title = HttpUtility.HtmlDecode((title.ChildNodes.Count == 1) ? title.ChildNodes[0].InnerText.Replace("\n", "").Replace("\r", "") : title.ChildNodes[1].InnerText.Replace("\n", "").Replace("\r", ""));
                             Console.WriteLine(entry.Title);
                         }
 
@@ -379,7 +274,7 @@ namespace indeed.com.scraper
                         var postedOn = detailsDoc.DocumentNode.SelectSingleNode("//span[@class='date']");
                         if (postedOn != null)
                         {
-                            entry.PostTime = HttpUtility.HtmlDecode(postedOn.InnerText.Replace("Posted","").Replace("\n", "").Replace("\r", ""));
+                            entry.PostTime = HttpUtility.HtmlDecode(postedOn.InnerText.Replace("Posted", "").Replace("\n", "").Replace("\r", ""));
                         }
                         var estimatedSalery = detailsDoc.DocumentNode.SelectSingleNode("//span[@class='estimated-salary']");
                         if (estimatedSalery != null)
@@ -399,8 +294,7 @@ namespace indeed.com.scraper
                     }
                     catch (Exception ex)
                     {
-
-                        Console.WriteLine("Unable to extract details. Reason: " + ex.Message);
+                        Console.WriteLine("Unable to extract details of the job. Reason: " + ex.Message);
                     }
                 }
                 if (getDescription)
@@ -420,13 +314,15 @@ namespace indeed.com.scraper
                                 entry.FullDescription = HttpUtility.HtmlDecode(descriptionNode.InnerText);
                             }
                         }
-                        catch (Exception)
+                        catch (Exception ex)
                         {
-
+                            Console.WriteLine("Unable to fetch full description of the job. Reason: " + ex.Message);
                         }
-
-                       // Program.records.Add(entry);
                     }
+            }
+            else
+            {
+                Console.WriteLine("No job found against the provided filter");
             }
         }
     }
