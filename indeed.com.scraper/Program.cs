@@ -122,7 +122,7 @@ namespace indeed.com.scraper
                             for (int i = 0; i < pages; i++)
                             {
                                 Console.WriteLine($"Processing page {i + 1}");
-                                string start = $"&start={(i * 50)}";
+                                string start = $"&start={(i * 10)}";
                                 if (!string.IsNullOrEmpty(age))
                                     switch (age)
                                     {
@@ -143,7 +143,7 @@ namespace indeed.com.scraper
                                     }
                                 var parts = url.Split(new string[] { "&_ga" }, StringSplitOptions.RemoveEmptyEntries);
                                 var newUrl =(parts[0]+ start);
-                                driver.Navigate().GoToUrl($"{newUrl}{"&_ga"+parts[1]}");
+                                driver.Navigate().GoToUrl($"{newUrl}{((parts.Length>1)?("&_ga"+parts[1]):"")}");
                                 Thread.Sleep(3000);
                                 if (i == 0)
                                 {
@@ -152,7 +152,7 @@ namespace indeed.com.scraper
 
                                     count = doc.DocumentNode.SelectSingleNode("//div[@id='searchCountPages']");
                                     var total = Convert.ToInt32(count.InnerText.Split(new string[] { "of" }, StringSplitOptions.RemoveEmptyEntries)[1].Replace("jobs", "").Replace(",", "").Trim());
-                                    pages = (total + 50 - 1) / 50;
+                                    pages = (total + 10 - 1) / 10;
                                 }
 
                                 ExtractData(driver);
